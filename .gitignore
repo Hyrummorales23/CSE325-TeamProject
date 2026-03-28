@@ -1,0 +1,18 @@
+# Create .gitignore
+echo "bin/
+obj/
+*.db
+*.db-shm
+*.db-wal
+appsettings.Development.json
+.vs/
+.vscode/
+*.user
+*.suo
+.DS_Store
+" > .gitignore
+
+# Add and commit
+git add .gitignore
+git commit -m "Add .gitignore"
+git push
