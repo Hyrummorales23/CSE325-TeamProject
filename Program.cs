@@ -1,14 +1,15 @@
 using Microsoft.EntityFrameworkCore;
+using BrodihyHabitTracker.Components;
 using BrodihyHabitTracker.Data;
 using BrodihyHabitTracker.Models;
-using Microsoft.AspNetCore.Identity;
 using BrodihyHabitTracker;
+using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor();
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
 
 // Add DbContext with SQLite
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -19,33 +20,32 @@ builder.Services.AddIdentity<User, IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
 
-// Add authentication
 builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
 
-// Add additional services for your app
-builder.Services.AddScoped<HabitService>(); // You'll create this
+builder.Services.AddScoped<HabitService>();
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error");
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
-
+app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
-app.UseStaticFiles();
-app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapBlazorHub();
-app.MapFallbackToPage("/_Host");
+app.UseAntiforgery();
 
-// Create database on startup (optional)
+app.MapStaticAssets();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+
+// Create database on startup
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
