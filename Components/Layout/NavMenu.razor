@@ -1,30 +1,111 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">BrodihyHabitTracker</a>
+@rendermode InteractiveServer
+@inject NavigationManager NavigationManager
+@inject UserManager<User> UserManager
+
+<nav class="sidebar">
+    <div class="sidebar-header">
+        <a href="/" class="sidebar-brand">
+            <div class="sidebar-brand-icon">
+                <i class="bi bi-bar-chart-fill"></i>
+            </div>
+            Brodihy
+        </a>
     </div>
-</div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+    <div class="sidebar-nav">
+        <div class="sidebar-section">Main</div>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
+        <NavLink href="/" Match="NavLinkMatch.All" class="sidebar-item" ActiveClass="active">
+            <span class="sidebar-item-icon"><i class="bi bi-house"></i></span>
+            Dashboard
+        </NavLink>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
+        <div class="sidebar-section">Habits</div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-    </nav>
-</div>
+        <NavLink href="/habits" class="sidebar-item" ActiveClass="active">
+            <span class="sidebar-item-icon"><i class="bi bi-check-circle"></i></span>
+            My Habits
+        </NavLink>
 
+        <NavLink href="/habits/new" class="sidebar-item" ActiveClass="active">
+            <span class="sidebar-item-icon"><i class="bi bi-plus-circle"></i></span>
+            Add Habit
+        </NavLink>
+
+        <NavLink href="/progress" class="sidebar-item" ActiveClass="active">
+            <span class="sidebar-item-icon"><i class="bi bi-graph-up"></i></span>
+            Progress
+        </NavLink>
+
+        <div class="sidebar-section">Account</div>
+
+        <NavLink href="/settings" class="sidebar-item" ActiveClass="active">
+            <span class="sidebar-item-icon"><i class="bi bi-gear"></i></span>
+            Settings
+        </NavLink>
+    </div>
+
+    <div class="sidebar-footer">
+        @if (currentUser != null)
+        {
+            <div class="sidebar-user">
+                <div class="sidebar-avatar">@GetInitials()</div>
+                <div class="sidebar-user-info">
+                    <div class="sidebar-user-name">@GetDisplayName()</div>
+                    <div class="sidebar-user-meta">@currentUser.Email</div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="sidebar-user">
+                <div class="sidebar-avatar" style="background: #374151;">?</div>
+                <div class="sidebar-user-info">
+                    <div class="sidebar-user-name skeleton" style="height:12px; width:80px;"></div>
+                    <div class="sidebar-user-meta skeleton" style="height:10px; width:110px; margin-top:5px;"></div>
+                </div>
+            </div>
+        }
+
+        <a href="/logout" class="sidebar-logout">
+            <i class="bi bi-box-arrow-right"></i> Sign out
+        </a>
+    </div>
+</nav>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    private User? currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthStateTask is null) return;
+
+        var authState = await AuthStateTask;
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!string.IsNullOrEmpty(userId))
+        {
+            currentUser = await UserManager.FindByIdAsync(userId);
+        }
+    }
+
+    private string GetDisplayName()
+    {
+        if (currentUser is null) return string.Empty;
+        var name = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
+        return string.IsNullOrEmpty(name) ? (currentUser.Email ?? "User") : name;
+    }
+
+    private string GetInitials()
+    {
+        if (currentUser is null) return "?";
+        var first = currentUser.FirstName?.FirstOrDefault();
+        var last  = currentUser.LastName?.FirstOrDefault();
+        if (first.HasValue && last.HasValue) return $"{first}{last}".ToUpper();
+        if (first.HasValue) return first.Value.ToString().ToUpper();
+        return (currentUser.Email?[0] ?? '?').ToString().ToUpper();
+    }
+}
