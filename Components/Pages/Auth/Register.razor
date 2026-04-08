@@ -1,0 +1,147 @@
+@page "/register"
+@layout AuthLayout
+@inject UserManager<User> UserManager
+@inject SignInManager<User> SignInManager
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create account — Brodihy</PageTitle>
+
+<div class="auth-form-box">
+    <h1 class="auth-form-title">Create your account</h1>
+    <p class="auth-form-subtitle">Start building better habits today.</p>
+
+    @if (errors.Count > 0)
+    {
+        <div class="alert alert-danger">
+            @foreach (var error in errors)
+            {
+                <div>@error</div>
+            }
+        </div>
+    }
+
+    <EditForm Model="Input" FormName="register" OnValidSubmit="HandleRegister" method="post">
+        <DataAnnotationsValidator />
+
+        <div class="form-row-2">
+            <div class="form-group">
+                <label class="form-label">First name</label>
+                <InputText @bind-Value="Input.FirstName"
+                           class="form-input"
+                           placeholder="Alex" />
+                <ValidationMessage For="() => Input.FirstName" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Last name</label>
+                <InputText @bind-Value="Input.LastName"
+                           class="form-input"
+                           placeholder="Smith" />
+                <ValidationMessage For="() => Input.LastName" />
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Email</label>
+            <InputText @bind-Value="Input.Email"
+                       class="form-input"
+                       placeholder="you@example.com"
+                       autocomplete="email" />
+            <ValidationMessage For="() => Input.Email" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Password</label>
+            <InputText type="password"
+                       @bind-Value="Input.Password"
+                       class="form-input"
+                       placeholder="At least 6 characters"
+                       autocomplete="new-password" />
+            <ValidationMessage For="() => Input.Password" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Confirm password</label>
+            <InputText type="password"
+                       @bind-Value="Input.ConfirmPassword"
+                       class="form-input"
+                       placeholder="Repeat your password"
+                       autocomplete="new-password" />
+            <ValidationMessage For="() => Input.ConfirmPassword" />
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg">Create account</button>
+    </EditForm>
+
+    <div class="auth-form-footer">
+        Already have an account? <a href="/login">Sign in</a>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private RegisterInput Input { get; set; } = new RegisterInput();
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private List<string> errors = new();
+
+    protected override void OnInitialized()
+    {
+        if (HttpContext.User.Identity?.IsAuthenticated == true)
+        {
+            NavigationManager.NavigateTo("/", forceLoad: true);
+        }
+    }
+
+    private async Task HandleRegister()
+    {
+        errors.Clear();
+
+        var user = new User
+        {
+            UserName = Input.Email,
+            Email = Input.Email,
+            FirstName = Input.FirstName,
+            LastName = Input.LastName,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var result = await UserManager.CreateAsync(user, Input.Password);
+
+        if (result.Succeeded)
+        {
+            await SignInManager.SignInAsync(user, isPersistent: false);
+            NavigationManager.NavigateTo("/", forceLoad: true);
+        }
+        else
+        {
+            errors = result.Errors.Select(e => e.Description).ToList();
+        }
+    }
+
+    private sealed class RegisterInput
+    {
+        [MaxLength(50)]
+        [RegularExpression(@"^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ'\- ]*$",
+            ErrorMessage = "First name can only contain letters, spaces, hyphens, and apostrophes.")]
+        public string? FirstName { get; set; }
+
+        [MaxLength(50)]
+        [RegularExpression(@"^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ'\- ]*$",
+            ErrorMessage = "Last name can only contain letters, spaces, hyphens, and apostrophes.")]
+        public string? LastName { get; set; }
+
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Enter a valid email.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Password is required.")]
+        [MinLength(6, ErrorMessage = "Password must be at least 6 characters.")]
+        public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Please confirm your password.")]
+        [Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}
