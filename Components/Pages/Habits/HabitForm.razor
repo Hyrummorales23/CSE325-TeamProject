@@ -1,0 +1,119 @@
+@page "/habits/new"
+@page "/habits/edit/{Id:int}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject HabitService HabitService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+
+<PageTitle>@(Id == 0 ? "New Habit" : "Edit Habit") — Brodihy</PageTitle>
+
+<div style="max-width:480px;">
+    <div style="margin-bottom:20px;">
+        <a href="/habits" style="font-size:13px; color:var(--text-secondary); text-decoration:none;">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+        <h2 style="font-size:18px; font-weight:500; margin-top:8px;">@(Id == 0 ? "New Habit" : "Edit Habit")</h2>
+    </div>
+
+    <div class="card">
+        <EditForm Model="model" OnValidSubmit="Save">
+            <DataAnnotationsValidator />
+
+            <div class="form-group">
+                <label class="form-label">Name</label>
+                <InputText @bind-Value="model.Name" class="form-input" placeholder="e.g. Morning run" />
+                <ValidationMessage For="() => model.Name" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Description <span style="font-weight:300; opacity:.6;">(optional)</span></label>
+                <InputTextArea @bind-Value="model.Description" class="form-input" rows="2"
+                    placeholder="Short description..." style="resize:none;" />
+            </div>
+
+            <div class="form-row-2">
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <InputSelect @bind-Value="model.Type" class="form-input">
+                        <option value="@HabitType.Physical">Physical</option>
+                        <option value="@HabitType.Mental">Mental</option>
+                        <option value="@HabitType.SocialEmotional">Social / Emotional</option>
+                        <option value="@HabitType.Spiritual">Spiritual</option>
+                    </InputSelect>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Times per week</label>
+                    <InputNumber @bind-Value="model.WeeklyFrequency" class="form-input" min="1" max="7" />
+                    <ValidationMessage For="() => model.WeeklyFrequency" />
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(error))
+            {
+                <div class="alert alert-danger">@error</div>
+            }
+
+            <div style="display:flex; gap:10px; margin-top:8px;">
+                <a href="/habits" class="btn btn-ghost" style="flex:1; justify-content:center;">Cancel</a>
+                <button type="submit" class="btn btn-primary" style="flex:2;" disabled="@saving">
+                    @if (saving) { <span class="spinner" style="width:14px; height:14px; border-width:2px;"></span> }
+                    else { <span>@(Id == 0 ? "Create Habit" : "Save Changes")</span> }
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    FormModel model = new();
+    string userId   = string.Empty;
+    string error    = string.Empty;
+    bool   saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        userId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+
+        if (Id != 0)
+        {
+            var habit = await HabitService.GetHabitByIdAsync(Id, userId);
+            if (habit is null) { Nav.NavigateTo("/habits"); return; }
+            model = new FormModel { Name = habit.Name, Description = habit.Description,
+                Type = habit.Type, WeeklyFrequency = habit.WeeklyFrequency };
+        }
+    }
+
+    async Task Save()
+    {
+        saving = true; error = string.Empty;
+        if (Id == 0)
+        {
+            var habit = new Habit { Name = model.Name, Description = model.Description,
+                Type = model.Type, WeeklyFrequency = model.WeeklyFrequency, UserId = userId };
+            await HabitService.CreateHabitAsync(habit);
+        }
+        else
+        {
+            var habit = await HabitService.GetHabitByIdAsync(Id, userId);
+            if (habit is not null)
+            {
+                habit.Name = model.Name; habit.Description = model.Description;
+                habit.Type = model.Type; habit.WeeklyFrequency = model.WeeklyFrequency;
+                await HabitService.UpdateHabitAsync(habit);
+            }
+        }
+        Nav.NavigateTo("/habits");
+    }
+
+    class FormModel
+    {
+        [Required, StringLength(100)] public string Name { get; set; } = string.Empty;
+        [StringLength(500)]           public string? Description { get; set; }
+        public HabitType Type { get; set; } = HabitType.Physical;
+        [Range(1, 7)]                 public int WeeklyFrequency { get; set; } = 3;
+    }
+}

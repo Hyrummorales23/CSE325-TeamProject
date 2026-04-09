@@ -1,0 +1,126 @@
+@page "/progress"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject HabitService HabitService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Progress — Brodihy</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-screen" style="min-height:60vh;"><div class="spinner"></div></div>
+}
+else
+{
+    <div style="margin-bottom:20px;">
+        <h2 style="font-size:18px; font-weight:500;">Progress</h2>
+        <div style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">
+            Week of @weekStart.ToString("MMM d") — @weekEnd.ToString("MMM d")
+        </div>
+    </div>
+
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr); margin-bottom:24px;">
+        <div class="stat-card">
+            <div class="stat-card-icon icon-indigo"><i class="bi bi-list-check"></i></div>
+            <div class="stat-card-value">@rows.Count</div>
+            <div class="stat-card-label">Active habits</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-card-icon icon-green"><i class="bi bi-check2-all"></i></div>
+            <div class="stat-card-value">@weeklyDone</div>
+            <div class="stat-card-label">Done this week</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-card-icon icon-amber"><i class="bi bi-bullseye"></i></div>
+            <div class="stat-card-value">@weeklyTarget</div>
+            <div class="stat-card-label">Weekly target</div>
+        </div>
+    </div>
+
+    @if (rows.Count == 0)
+    {
+        <div class="card">
+            <div class="empty-state">
+                <span class="empty-state-icon"><i class="bi bi-graph-up"></i></span>
+                <div class="empty-state-title">No habits to track</div>
+                <p class="empty-state-desc">Add habits first to see your progress here.</p>
+                <a href="/habits/new" class="btn btn-primary" style="width:auto; padding:10px 20px;">
+                    <i class="bi bi-plus-lg"></i> Add habit
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-header"><span class="card-title">This week</span></div>
+            <div style="display:flex; flex-direction:column; gap:18px;">
+                @foreach (var row in rows)
+                {
+                    var pct     = row.Target == 0 ? 0 : Math.Min(100, row.Done * 100 / row.Target);
+                    var color   = pct >= 100 ? "var(--success)" : pct >= 50 ? "var(--primary)" : "var(--warning)";
+                    var typeColor = TypeColor(row.Habit.Type);
+                    <div>
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:7px;">
+                            <div class="stat-card-icon @typeColor" style="width:30px; height:30px; border-radius:7px; font-size:13px; flex-shrink:0;">
+                                <i class="bi @TypeIcon(row.Habit.Type)"></i>
+                            </div>
+                            <div style="flex:1; min-width:0;">
+                                <div style="font-size:13.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">@row.Habit.Name</div>
+                            </div>
+                            <div style="font-size:13px; font-weight:500; color:@color; flex-shrink:0;">@row.Done/@row.Target</div>
+                        </div>
+                        <div style="height:6px; background:var(--border); border-radius:99px; overflow:hidden;">
+                            <div style="height:100%; width:@(pct)%; background:@color; border-radius:99px; transition:width 0.4s ease;"></div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    record ProgressRow(Habit Habit, int Done, int Target);
+
+    bool isLoading = true;
+    string userId  = string.Empty;
+    List<ProgressRow> rows = new();
+    int weeklyDone, weeklyTarget;
+    DateTime weekStart, weekEnd;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        userId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+
+        weekStart = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
+        weekEnd   = weekStart.AddDays(6);
+
+        var habits = await HabitService.GetUserHabitsAsync(userId);
+        foreach (var h in habits)
+        {
+            var done = await HabitService.GetWeeklyProgressAsync(h.Id, userId);
+            rows.Add(new(h, done, h.WeeklyFrequency));
+            weeklyDone   += done;
+            weeklyTarget += h.WeeklyFrequency;
+        }
+        isLoading = false;
+    }
+
+    static string TypeColor(HabitType t) => t switch {
+        HabitType.Physical        => "icon-green",
+        HabitType.Mental          => "icon-indigo",
+        HabitType.SocialEmotional => "icon-amber",
+        HabitType.Spiritual       => "icon-rose",
+        _                         => "icon-indigo"
+    };
+
+    static string TypeIcon(HabitType t) => t switch {
+        HabitType.Physical        => "bi-activity",
+        HabitType.Mental          => "bi-lightbulb",
+        HabitType.SocialEmotional => "bi-people",
+        HabitType.Spiritual       => "bi-stars",
+        _                         => "bi-check-circle"
+    };
+}
