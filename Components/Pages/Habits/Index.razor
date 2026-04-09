@@ -1,0 +1,140 @@
+@page "/habits"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject HabitService HabitService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+
+<PageTitle>My Habits — Brodihy</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-screen" style="min-height:60vh;"><div class="spinner"></div></div>
+}
+else
+{
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+        <div>
+            <h2 style="font-size:18px; font-weight:500;">My Habits</h2>
+            <div style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">
+                Today @completedToday/@rows.Count &nbsp;·&nbsp; This week @weeklyDone/@weeklyTarget
+            </div>
+        </div>
+        <a href="/habits/new" class="btn btn-primary" style="width:auto;">
+            <i class="bi bi-plus-lg"></i> Add Habit
+        </a>
+    </div>
+
+    @if (rows.Count == 0)
+    {
+        <div class="card">
+            <div class="empty-state">
+                <span class="empty-state-icon"><i class="bi bi-journal-plus"></i></span>
+                <div class="empty-state-title">No habits yet</div>
+                <p class="empty-state-desc">Start by adding your first habit to track.</p>
+                <a href="/habits/new" class="btn btn-primary" style="width:auto; padding:10px 20px;">
+                    <i class="bi bi-plus-lg"></i> Add habit
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card" style="padding:16px;">
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                @foreach (var row in rows)
+                {
+                    var doneColor  = row.DoneToday ? "var(--success)" : "var(--border)";
+                    var doneBg     = row.DoneToday ? "var(--success)" : "transparent";
+                    var doneText   = row.DoneToday ? "#fff" : "var(--text-muted)";
+                    var progColor  = row.WeeklyDone >= row.Habit.WeeklyFrequency ? "var(--success)" : "var(--text-secondary)";
+                    <div style="display:flex; align-items:center; gap:12px; padding:12px 14px; border:1px solid var(--border); border-radius:var(--radius-sm);">
+                        <div class="stat-card-icon @TypeColor(row.Habit.Type)" style="width:36px; height:36px; border-radius:9px; flex-shrink:0; font-size:15px;">
+                            <i class="bi @TypeIcon(row.Habit.Type)"></i>
+                        </div>
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:13.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">@row.Habit.Name</div>
+                            <div style="font-size:12px; color:var(--text-muted);">@row.Habit.Type &middot; @row.Habit.WeeklyFrequency&times;/week</div>
+                        </div>
+                        <button @onclick="() => Toggle(row.Habit.Id)"
+                            style="width:32px; height:32px; border-radius:var(--radius-sm); border:2px solid @doneColor; background:@doneBg; color:@doneText; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; transition:all var(--t);">
+                            @if (row.DoneToday) { <i class="bi bi-check-lg"></i> }
+                        </button>
+                        <div style="font-size:13px; font-weight:500; min-width:36px; text-align:center; color:@progColor;">
+                            @row.WeeklyDone/@row.Habit.WeeklyFrequency
+                        </div>
+                        <a href="/habits/edit/@row.Habit.Id" class="btn btn-ghost btn-sm">Edit</a>
+                        <button @onclick="() => Delete(row.Habit.Id)" class="btn btn-ghost btn-sm" style="color:var(--danger);">Del</button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    record HabitRow(Habit Habit, bool DoneToday, int WeeklyDone);
+
+    bool isLoading = true;
+    string userId = string.Empty;
+    List<HabitRow> rows = new();
+    int completedToday, weeklyDone, weeklyTarget;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        userId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        await Load();
+        isLoading = false;
+    }
+
+    async Task Load()
+    {
+        var habits = await HabitService.GetUserHabitsAsync(userId);
+        rows.Clear(); completedToday = weeklyDone = weeklyTarget = 0;
+        foreach (var h in habits)
+        {
+            var done   = h.Completions.Any(c => c.CompletionDate.Date == DateTime.Today);
+            var weekly = await HabitService.GetWeeklyProgressAsync(h.Id, userId);
+            rows.Add(new(h, done, weekly));
+            if (done) completedToday++;
+            weeklyDone += weekly; weeklyTarget += h.WeeklyFrequency;
+        }
+    }
+
+    async Task Toggle(int habitId)
+    {
+        var done = await HabitService.ToggleCompletionAsync(habitId, DateTime.Today, userId);
+        var idx = rows.FindIndex(r => r.Habit.Id == habitId);
+        var r = rows[idx];
+        rows[idx] = new(r.Habit, done, done ? r.WeeklyDone + 1 : r.WeeklyDone - 1);
+        completedToday = rows.Count(x => x.DoneToday);
+        weeklyDone += done ? 1 : -1;
+    }
+
+    async Task Delete(int habitId)
+    {
+        var idx = rows.FindIndex(r => r.Habit.Id == habitId);
+        var removed = rows[idx];
+        await HabitService.DeleteHabitAsync(habitId, userId);
+        rows.RemoveAt(idx);
+        if (removed.DoneToday) completedToday--;
+        weeklyDone -= removed.WeeklyDone; weeklyTarget -= removed.Habit.WeeklyFrequency;
+    }
+
+    static string TypeColor(HabitType t) => t switch {
+        HabitType.Physical        => "icon-green",
+        HabitType.Mental          => "icon-indigo",
+        HabitType.SocialEmotional => "icon-amber",
+        HabitType.Spiritual       => "icon-rose",
+        _                         => "icon-indigo"
+    };
+
+    static string TypeIcon(HabitType t) => t switch {
+        HabitType.Physical        => "bi-activity",
+        HabitType.Mental          => "bi-lightbulb",
+        HabitType.SocialEmotional => "bi-people",
+        HabitType.Spiritual       => "bi-stars",
+        _                         => "bi-check-circle"
+    };
+}

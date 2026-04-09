@@ -182,8 +182,9 @@ else
                     ? (user.UserName?.Split('@')[0] ?? "there")
                     : fullName.Split(' ')[0];
 
-                habits     = await HabitService.GetUserHabitsAsync(userId);
+                habits      = await HabitService.GetUserHabitsAsync(userId);
                 totalHabits = habits.Count;
+                completedToday = habits.Count(h => h.Completions.Any(c => c.CompletionDate.Date == DateTime.Today));
 
                 foreach (var habit in habits)
                     weeklyTotal += await HabitService.GetWeeklyProgressAsync(habit.Id, userId);

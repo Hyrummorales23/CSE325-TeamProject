@@ -1,0 +1,18 @@
+@using Microsoft.AspNetCore.Components.Web
+@inherits ErrorBoundary
+
+@if (CurrentException is null)
+{
+    @ChildContent
+}
+else
+{
+    <div class="error-boundary">
+        <div class="error-boundary-icon">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+        </div>
+        <h3>Algo salió mal</h3>
+        <p class="error-boundary-message">@CurrentException.Message</p>
+        <button class="btn btn-primary" @onclick="Recover">Intentar de nuevo</button>
+    </div>
+}

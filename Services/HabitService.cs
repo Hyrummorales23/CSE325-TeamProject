@@ -6,18 +6,17 @@ namespace BrodihyHabitTracker
 {
     public class HabitService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _factory;
 
-        public HabitService(ApplicationDbContext context)
+        public HabitService(IDbContextFactory<ApplicationDbContext> factory)
         {
-            _context = context;
+            _factory = factory;
         }
-
-        // CRUD Operations
 
         public async Task<List<Habit>> GetUserHabitsAsync(string userId)
         {
-            return await _context.Habits
+            using var ctx = await _factory.CreateDbContextAsync();
+            return await ctx.Habits
                 .Where(h => h.UserId == userId && h.IsActive)
                 .Include(h => h.Completions)
                 .ToListAsync();
@@ -25,73 +24,71 @@ namespace BrodihyHabitTracker
 
         public async Task<Habit?> GetHabitByIdAsync(int id, string userId)
         {
-            return await _context.Habits
+            using var ctx = await _factory.CreateDbContextAsync();
+            return await ctx.Habits
                 .FirstOrDefaultAsync(h => h.Id == id && h.UserId == userId);
         }
 
         public async Task CreateHabitAsync(Habit habit)
         {
+            using var ctx = await _factory.CreateDbContextAsync();
             habit.CreatedAt = DateTime.UtcNow;
-            _context.Habits.Add(habit);
-            await _context.SaveChangesAsync();
+            ctx.Habits.Add(habit);
+            await ctx.SaveChangesAsync();
         }
 
         public async Task UpdateHabitAsync(Habit habit)
         {
-            _context.Habits.Update(habit);
-            await _context.SaveChangesAsync();
+            using var ctx = await _factory.CreateDbContextAsync();
+            ctx.Habits.Update(habit);
+            await ctx.SaveChangesAsync();
         }
 
         public async Task DeleteHabitAsync(int id, string userId)
         {
-            var habit = await GetHabitByIdAsync(id, userId);
+            using var ctx = await _factory.CreateDbContextAsync();
+            var habit = await ctx.Habits.FirstOrDefaultAsync(h => h.Id == id && h.UserId == userId);
             if (habit != null)
             {
-                // Soft delete - mark as inactive
                 habit.IsActive = false;
-                await _context.SaveChangesAsync();
+                await ctx.SaveChangesAsync();
             }
         }
 
-        // Habit Completion Operations
-
         public async Task<bool> ToggleCompletionAsync(int habitId, DateTime date, string userId)
         {
-            var existing = await _context.HabitCompletions
+            using var ctx = await _factory.CreateDbContextAsync();
+            var existing = await ctx.HabitCompletions
                 .FirstOrDefaultAsync(hc => hc.HabitId == habitId
                     && hc.CompletionDate.Date == date.Date
                     && hc.UserId == userId);
 
             if (existing != null)
             {
-                _context.HabitCompletions.Remove(existing);
-                await _context.SaveChangesAsync();
-                return false; // Completion removed
+                ctx.HabitCompletions.Remove(existing);
+                await ctx.SaveChangesAsync();
+                return false;
             }
-            else
+
+            ctx.HabitCompletions.Add(new HabitCompletion
             {
-                var completion = new HabitCompletion
-                {
-                    HabitId = habitId,
-                    CompletionDate = date.Date,
-                    UserId = userId
-                };
-                _context.HabitCompletions.Add(completion);
-                await _context.SaveChangesAsync();
-                return true; // Completion added
-            }
+                HabitId = habitId,
+                CompletionDate = date.Date,
+                UserId = userId
+            });
+            await ctx.SaveChangesAsync();
+            return true;
         }
 
         public async Task<int> GetWeeklyProgressAsync(int habitId, string userId)
         {
-            var startOfWeek = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
-            var endOfWeek = startOfWeek.AddDays(7);
-
-            return await _context.HabitCompletions
+            using var ctx = await _factory.CreateDbContextAsync();
+            var start = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
+            return await ctx.HabitCompletions
                 .CountAsync(hc => hc.HabitId == habitId
                     && hc.UserId == userId
-                    && hc.CompletionDate >= startOfWeek
-                    && hc.CompletionDate < endOfWeek);
+                    && hc.CompletionDate >= start
+                    && hc.CompletionDate < start.AddDays(7));
         }
     }
 }

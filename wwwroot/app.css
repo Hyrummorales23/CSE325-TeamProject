@@ -827,3 +827,35 @@ p { margin: 0; }
   .form-row-2 { grid-template-columns: 1fr; }
   .welcome-banner { padding: 22px 20px; }
 }
+
+/* ================================================
+   ERROR BOUNDARY
+   ================================================ */
+.error-boundary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  gap: 12px;
+}
+
+.error-boundary-icon {
+  font-size: 3rem;
+  color: #e74c3c;
+}
+
+.error-boundary h3 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a2e);
+  margin: 0;
+}
+
+.error-boundary-message {
+  color: var(--text-secondary, #666);
+  font-size: 0.95rem;
+  max-width: 480px;
+  margin: 0;
+}

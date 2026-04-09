@@ -2,7 +2,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSE325-TeamProject", "CSE325-TeamProject.csproj", "{7C2C1648-D22E-9A5B-7D9C-CF324C746778}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BrodihyHabitTracker", "BrodihyHabitTracker.csproj", "{7C2C1648-D22E-9A5B-7D9C-CF324C746778}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
